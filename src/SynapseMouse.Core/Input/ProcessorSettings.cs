@@ -53,37 +53,23 @@ public sealed class ProcessorSettings
     public ClickTransform[] Transforms { get; init; } = new ClickTransform[ButtonCount];
 
     public long DebounceUs { get; init; }
-
     public DebounceMode DebounceMode { get; init; }
-
     public MouseButtonFlags DebounceButtons { get; init; }
-
     public bool SuppressDuplicates { get; init; }
 
     public double MoveX { get; init; } = 1.0;
-
     public double MoveY { get; init; } = 1.0;
-
     public double ClutchX { get; init; } = 1.0;
-
     public double ClutchY { get; init; } = 1.0;
-
     public bool ClutchMapped { get; init; }
 
     public bool ReverseVertical { get; init; }
-
     public bool ReverseHorizontal { get; init; }
-
     public HorizontalScrollModifier HorizontalModifier { get; init; }
-
     public double ScrollSensitivity { get; init; } = 1.0;
-
     public bool ScrollFineGrained { get; init; }
-
     public bool ScrollAcceleration { get; init; }
-
     public int ScrollAccelerationStrength { get; init; }
-
     public double ScrollAccelerationMax { get; init; } = 1.0;
 
     /// <summary>Movement must be intercepted (software DPI/sensitivity or a clutch button).</summary>
@@ -97,15 +83,15 @@ public sealed class ProcessorSettings
     /// <summary>Whether a low-level mouse hook is required at all (otherwise zero overhead).</summary>
     public bool NeedsMouseHook =>
         Enabled && (SourceActions.Any(a => a.Type != ActionType.Default)
-                    || (DebounceUs > 0 && DebounceButtons != MouseButtonFlags.None)
-                    || Transforms.Any(t => !t.IsIdentity)
-                    || SuppressDuplicates
-                    || MovementInterception
-                    || ScrollInterception);
+            || (DebounceUs > 0 && DebounceButtons != MouseButtonFlags.None)
+            || Transforms.Any(t => !t.IsIdentity)
+            || SuppressDuplicates
+            || MovementInterception
+            || ScrollInterception);
 
     public bool NeedsKeyboardHook => Enabled && VirtualButtons.Length > 0;
 
-    public static ProcessorSettings FromConfig(MouseConfig config, bool enabled)
+    public static ProcessorSettings FromConfig(MouseConfig config, bool enabled, bool doubleClickSuspended = false)
     {
         if (!enabled)
         {
@@ -120,7 +106,6 @@ public sealed class ProcessorSettings
             {
                 continue;
             }
-
             actions[index] = ToSpec(mapping.Action, mapping.Key, mapping.Source.IsWheel());
         }
 
@@ -131,38 +116,41 @@ public sealed class ProcessorSettings
             {
                 continue;
             }
-
             var spec = ToSpec(vb.Action, vb.Key, false);
             if (spec.Type is ActionType.Default or ActionType.Disabled)
             {
                 continue;
             }
-
             virtualButtons.Add(new VirtualButtonSpec(vb.Id, vb.Trigger.Key, vb.Trigger.Modifiers, spec));
         }
 
         var transforms = new ClickTransform[ButtonCount];
         var response = config.ClickResponse;
         var dbl = config.DoubleClick;
+        var dblRight = config.DoubleClickRight;
         for (int i = 0; i < ButtonCount; i++)
         {
             var button = (MouseButton)i;
             bool responseOn = response.Enabled && response.Buttons.Has(button);
-            bool doubleOn = dbl.Enabled && dbl.Buttons.Has(button);
+            bool rightOn = dblRight.Enabled && dblRight.Buttons.Has(button);
+            bool legacyOn = dbl.Enabled && dbl.Buttons.Has(button);
+            bool doubleOn = !doubleClickSuspended && (rightOn || legacyOn);
+            // The dedicated right-button settings win when both would apply to the same button.
+            var dblSource = rightOn ? dblRight : dbl;
             transforms[i] = new ClickTransform(
                 responseOn ? response.PressDelayMs * 1000L : 0,
                 responseOn ? response.ReleaseDelayMs * 1000L : 0,
                 responseOn ? response.MinimumHoldMs * 1000L : 0,
                 doubleOn,
-                dbl.Timing,
-                dbl.IntervalMs * 1000L,
-                dbl.PressDurationMs * 1000L);
+                dblSource.Timing,
+                dblSource.IntervalMs * 1000L,
+                dblSource.PressDurationMs * 1000L);
         }
 
         var (moveX, moveY) = PointerMath.MovementMultipliers(config.Sensitivity);
         var (clutchX, clutchY) = PointerMath.ClutchMultipliers(config.Sensitivity);
         bool clutchMapped = actions.Any(a => a.Type == ActionType.SensitivityClutch)
-                            || virtualButtons.Any(v => v.Action.Type == ActionType.SensitivityClutch);
+            || virtualButtons.Any(v => v.Action.Type == ActionType.SensitivityClutch);
 
         var scroll = config.Scroll;
         return new ProcessorSettings
@@ -199,12 +187,10 @@ public sealed class ProcessorSettings
                 ? new ActionSpec(ActionType.Keyboard, key.Key, key.Modifiers)
                 : ActionSpec.Default;
         }
-
         if (isWheel && action == ActionType.SensitivityClutch)
         {
             return ActionSpec.Default;
         }
-
         return new ActionSpec(action, 0, KeyModifiers.None);
     }
 }

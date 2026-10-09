@@ -6,12 +6,14 @@ using static SynapseMouse.App.Native.NativeMethods;
 namespace SynapseMouse.App.Services;
 
 /// <summary>
-/// Global hotkeys via RegisterHotKey (config switching, DPI stages, Master Enable). Hotkeys only switch
-/// settings; they never generate game input.
+/// Global hotkeys via RegisterHotKey (config switching, DPI stages, Master Enable, the Single → Double
+/// click toggle). Hotkeys only switch settings; they never generate game input.
 /// </summary>
 internal sealed class HotkeyService : IDisposable
 {
     public const string EmergencyId = "emergency";
+    /// <summary>Hotkey id of the Single → Double click on/off toggle.</summary>
+    public const string DoubleClickToggleId = "double-click-toggle";
 
     private readonly MessageWindow _window;
     private readonly Dictionary<int, string> _registered = new();
@@ -43,7 +45,6 @@ internal sealed class HotkeyService : IDisposable
             {
                 continue;
             }
-
             if (!used.Add((chord.Key, chord.Modifiers)))
             {
                 failed.Add(id); // Same combination already used by another Synapse hotkey.
@@ -55,7 +56,6 @@ internal sealed class HotkeyService : IDisposable
             {
                 _nextId = 1;
             }
-
             if (RegisterHotKey(_window.Handle, nativeId, ToNativeModifiers(chord.Modifiers) | MOD_NOREPEAT, (uint)chord.Key))
             {
                 _registered[nativeId] = id;
@@ -66,7 +66,6 @@ internal sealed class HotkeyService : IDisposable
                 Log.Warn($"Hotkey {chord} ({id}) could not be registered (error {Marshal.GetLastWin32Error()}).");
             }
         }
-
         Failed = failed;
     }
 
@@ -82,7 +81,6 @@ internal sealed class HotkeyService : IDisposable
         {
             UnregisterHotKey(_window.Handle, id);
         }
-
         _registered.Clear();
     }
 
@@ -102,22 +100,18 @@ internal sealed class HotkeyService : IDisposable
         {
             m |= MOD_ALT;
         }
-
         if (modifiers.HasFlag(KeyModifiers.Ctrl))
         {
             m |= MOD_CONTROL;
         }
-
         if (modifiers.HasFlag(KeyModifiers.Shift))
         {
             m |= MOD_SHIFT;
         }
-
         if (modifiers.HasFlag(KeyModifiers.Win))
         {
             m |= MOD_WIN;
         }
-
         return m;
     }
 }

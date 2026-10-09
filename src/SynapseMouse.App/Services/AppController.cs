@@ -29,6 +29,7 @@ internal sealed class AppController : IDisposable
     private readonly Dispatcher _dispatcher;
     private readonly MessageWindow _messageWindow;
     private readonly DispatcherTimer _healthTimer;
+
     private NativeMethods.POINT _lastCursor;
     private uint _lastForegroundPid;
     private Guid? _lastMatchId;
@@ -37,6 +38,7 @@ internal sealed class AppController : IDisposable
     public AppController()
     {
         _dispatcher = Dispatcher.CurrentDispatcher;
+
         DataDirectory = StoragePaths.ResolveDataDirectory();
         var store = new SettingsStore(DataDirectory);
         LoadResult load = store.Load();
@@ -95,63 +97,46 @@ internal sealed class AppController : IDisposable
 
     /// <summary>Master Enable, engine or device status changed.</summary>
     public event EventHandler? StateChanged;
-
     public event EventHandler? ActiveConfigChanged;
-
     public event EventHandler? ConfigListChanged;
-
     /// <summary>A setting of the active config changed. The sender is the view model that made the edit.</summary>
     public event EventHandler? ConfigEdited;
-
     public event EventHandler? AppSettingsChanged;
-
     public event EventHandler? DevicesChanged;
-
     public event EventHandler? HotkeysChanged;
-
     public event EventHandler<ForegroundInfo>? ForegroundChanged;
-
     /// <summary>The main window should be shown (argument: page key or null).</summary>
     public event Action<string?>? ShowWindowRequested;
 
     // ------------------------------------------------------------------ services
 
     public ConfigManager Configs { get; }
-
     public AutoSaver Saver { get; }
-
     public InputEngine Engine { get; }
-
     public WindowsMouseSettings WindowsSettings { get; }
-
     public DeviceService Devices { get; }
-
     public RawInputMonitor RawInput { get; }
-
     public HotkeyService Hotkeys { get; }
-
     public ForegroundWatcher Foreground { get; }
-
     public OsdService Osd { get; }
-
     public TrayService Tray { get; }
-
     public string DataDirectory { get; private set; }
-
     public string? LoadWarning { get; }
-
     public bool IsFirstRun { get; }
 
     // ------------------------------------------------------------------ state
 
     public MouseConfig ActiveConfig => Configs.Active;
-
     public AppSettings App => Configs.App;
-
     public ProcessorSettings CurrentSettings { get; private set; }
-
     /// <summary>The current config was selected by automatic (per-application) switching.</summary>
     public bool AutoSelected { get; private set; }
+
+    /// <summary>
+    /// True while the Single → Double click toggle hotkey has turned the feature off for every button.
+    /// Session state only: the saved config is unchanged, so a restart resumes the saved settings.
+    /// </summary>
+    public bool DoubleClickSuspended { get; private set; }
 
     public bool MasterEnabled =>
         App.MasterScope == MasterScope.PerConfig ? Configs.Active.MasterEnabled : Configs.Document.MasterEnabled;
@@ -167,22 +152,18 @@ internal sealed class AppController : IDisposable
             {
                 return "Input engine stopped";
             }
-
             if (!MasterEnabled)
             {
                 return "Idle — Master Enable is off, Windows handles the mouse normally";
             }
-
             if (Engine.BypassActive)
             {
                 return "Paused while an administrator window is focused";
             }
-
             if (Engine.MouseHookActive || Engine.KeyboardHookActive)
             {
                 return "Processing input in the background";
             }
-
             return "Active — only Windows settings are applied (no input processing needed)";
         }
     }
@@ -218,14 +199,12 @@ internal sealed class AppController : IDisposable
         {
             Watchdog.Launch();
         }
-
         UpdateTray();
         _healthTimer.Start();
         if (IsFirstRun)
         {
             Saver.Flush(force: true);
         }
-
         Log.Info($"Started. Master={(MasterEnabled ? "on" : "off")}, config='{ActiveConfig.Name}'.");
     }
 
@@ -238,7 +217,6 @@ internal sealed class AppController : IDisposable
         {
             return;
         }
-
         _exiting = true;
         Log.Info("Exiting.");
         _healthTimer.Stop();
@@ -261,7 +239,6 @@ internal sealed class AppController : IDisposable
         {
             Log.Error("Emergency engine shutdown failed.", ex);
         }
-
         try
         {
             WindowsSettings.RestoreNow();
@@ -270,7 +247,6 @@ internal sealed class AppController : IDisposable
         {
             Log.Error("Emergency settings restore failed.", ex);
         }
-
         try
         {
             Saver.Flush();
@@ -301,7 +277,6 @@ internal sealed class AppController : IDisposable
         {
             return;
         }
-
         SetMasterValue(enabled);
         Configs.NotifyAppSettingsEdited();
         ApplyActive();
@@ -310,7 +285,6 @@ internal sealed class AppController : IDisposable
         {
             Osd.Show("Master Enable", enabled ? "● ENABLED" : "○ DISABLED");
         }
-
         Log.Info($"Master Enable {(enabled ? "on" : "off")}.");
     }
 
@@ -320,8 +294,19 @@ internal sealed class AppController : IDisposable
         {
             Configs.Active.MasterEnabled = enabled;
         }
-
         Configs.Document.MasterEnabled = enabled;
+    }
+
+    /// <summary>Turns Single → Double click on or off without changing the saved config (the toggle hotkey).</summary>
+    public void ToggleDoubleClickSuspension(bool showOsd)
+    {
+        DoubleClickSuspended = !DoubleClickSuspended;
+        ApplyActive();
+        if (showOsd)
+        {
+            Osd.Show("Single → Double click", DoubleClickSuspended ? "○ OFF" : "● ON");
+        }
+        Log.Info($"Single → Double click {(DoubleClickSuspended ? "paused" : "resumed")} (toggle hotkey).");
     }
 
     // ------------------------------------------------------------------ configs
@@ -333,24 +318,20 @@ internal sealed class AppController : IDisposable
         {
             return;
         }
-
         if (reason != SwitchReason.Auto)
         {
             App.LastManualConfigId = id;
             AutoSelected = false;
         }
-
         if (!Configs.SetActive(id))
         {
             Configs.NotifyAppSettingsEdited();
             return;
         }
-
         if (reason is SwitchReason.Hotkey or SwitchReason.Auto or SwitchReason.Command)
         {
             Osd.Show(reason == SwitchReason.Auto ? "Config (automatic)" : "Config", target.Name);
         }
-
         Log.Info($"Config switched to '{target.Name}' ({reason}).");
     }
 
@@ -381,7 +362,6 @@ internal sealed class AppController : IDisposable
         {
             return;
         }
-
         s.ActiveStage = index;
         s.Stages[index].Enabled = true;
         OnConfigEdited(sender);
@@ -400,10 +380,8 @@ internal sealed class AppController : IDisposable
             {
                 Osd.Show("DPI", "Software DPI stages are off");
             }
-
             return;
         }
-
         int next = cycle ? PointerMath.NextStage(s, +1, wrap: true) : PointerMath.NextStage(s, direction, wrap: false);
         SetActiveStage(next, null, showOsd);
     }
@@ -420,15 +398,14 @@ internal sealed class AppController : IDisposable
         {
             Log.Warn("Could not remove the startup entry.", ex);
         }
-
         AutoSelected = false;
+        DoubleClickSuspended = false;
         var doc = ConfigPresets.CreateDefaultDocument();
         Configs.ReplaceDocument(doc);
         if (!Watchdog.IsRunning)
         {
             Watchdog.Launch();
         }
-
         OnAppSettingsEdited(null);
         Saver.Flush(force: true);
     }
@@ -447,7 +424,6 @@ internal sealed class AppController : IDisposable
         {
             throw new ConfigFormatException("The file is too large to be a Synapse backup.");
         }
-
         var doc = ConfigSerializer.DeserializeDocument(File.ReadAllText(path));
         AutoSelected = false;
         Configs.ReplaceDocument(doc);
@@ -459,7 +435,6 @@ internal sealed class AppController : IDisposable
         {
             Log.Warn("Could not update the startup entry.", ex);
         }
-
         if (doc.App.WatchdogEnabled && !Watchdog.IsRunning)
         {
             Watchdog.Launch();
@@ -468,7 +443,6 @@ internal sealed class AppController : IDisposable
         {
             Watchdog.Stop();
         }
-
         OnAppSettingsEdited(null);
         Saver.Flush(force: true);
     }
@@ -490,7 +464,7 @@ internal sealed class AppController : IDisposable
     {
         var config = Configs.Active;
         bool enabled = MasterEnabled;
-        var settings = ProcessorSettings.FromConfig(config, enabled);
+        var settings = ProcessorSettings.FromConfig(config, enabled, DoubleClickSuspended);
         var desired = enabled ? BuildDesired(config, settings) : DesiredWindowsSettings.None;
         WindowsSettings.ApplyAsync(desired);
         int speed = WindowsSettings.PredictPointerSpeed(desired);
@@ -533,6 +507,7 @@ internal sealed class AppController : IDisposable
             ("dpi-up", App.DpiUpHotkey),
             ("dpi-down", App.DpiDownHotkey),
             ("dpi-cycle", App.DpiCycleHotkey),
+            (HotkeyService.DoubleClickToggleId, App.DoubleClickToggleHotkey),
         };
         list.AddRange(Configs.Configs.Select(c => ("config:" + c.Id.ToString("N"), c.Hotkey)));
         Hotkeys.SetHotkeys(list);
@@ -554,24 +529,23 @@ internal sealed class AppController : IDisposable
                 {
                     ChangeDpiStage(+1, false, true);
                 }
-
                 return;
             case "dpi-down":
                 if (MasterEnabled)
                 {
                     ChangeDpiStage(-1, false, true);
                 }
-
                 return;
             case "dpi-cycle":
                 if (MasterEnabled)
                 {
                     ChangeDpiStage(+1, true, true);
                 }
-
+                return;
+            case HotkeyService.DoubleClickToggleId:
+                ToggleDoubleClickSuspension(showOsd: true);
                 return;
         }
-
         if (id.StartsWith("config:", StringComparison.Ordinal) && Guid.TryParseExact(id[7..], "N", out Guid configId))
         {
             SwitchConfig(configId, SwitchReason.Hotkey);
@@ -584,7 +558,6 @@ internal sealed class AppController : IDisposable
         {
             return;
         }
-
         switch (command)
         {
             case ProcessorCommand.DpiStageUp:
@@ -628,15 +601,14 @@ internal sealed class AppController : IDisposable
         {
             return; // Same app, same match: respect manual choices made meanwhile.
         }
-
         _lastForegroundPid = info.ProcessId;
         _lastMatchId = match?.Id;
+
         Guid? target = AutoSwitchLogic.Decide(App, Configs.Active.Id, Configs.Document.DefaultConfigId, AutoSelected, match, id => Configs.Find(id) is not null);
         if (target is { } id)
         {
             SwitchConfig(id, SwitchReason.Auto);
         }
-
         AutoSelected = App.AutoSwitchEnabled && match is not null && Configs.Active.Id == match.ConfigId;
     }
 
@@ -648,7 +620,6 @@ internal sealed class AppController : IDisposable
         {
             return;
         }
-
         Tray.Update(MasterEnabled, ActiveConfig.Name, Configs.Configs.Select(c => (c.Id, c.Name)).ToList(), ActiveConfig.Id);
     }
 
@@ -660,7 +631,6 @@ internal sealed class AppController : IDisposable
         {
             return;
         }
-
         NativeMethods.GetCursorPos(out var cursor);
         bool moved = cursor.X != _lastCursor.X || cursor.Y != _lastCursor.Y;
         _lastCursor = cursor;

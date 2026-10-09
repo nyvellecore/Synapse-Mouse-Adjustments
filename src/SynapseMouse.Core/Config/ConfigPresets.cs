@@ -18,9 +18,9 @@ public static class ConfigPresets
     {
         Default => "Everything off — normal Windows mouse behavior.",
         Gaming => "4 ms debounce, no pointer acceleration, software DPI stages.",
-        MinecraftPvp => "5 ms debounce, no acceleration, DPI stages; Single → Double click pre-set to 50 ms (off).",
-        SwordPvp => "3 ms debounce, no acceleration; Single → Double click pre-set to 40 ms (off).",
-        MacePvp => "4 ms debounce on both buttons, no acceleration; Single → Double pre-set to 55 ms (off).",
+        MinecraftPvp => "5 ms debounce, no acceleration, DPI stages; Single → Double click (left and right) pre-set to 50 ms (off).",
+        SwordPvp => "3 ms debounce, no acceleration; Single → Double click (left and right) pre-set to 40 ms (off).",
+        MacePvp => "4 ms debounce on both buttons, no acceleration; Single → Double click (left and right) pre-set to 55 ms (off).",
         Custom => "A blank config to build your own setup.",
         _ => "Custom setup.",
     };
@@ -52,6 +52,8 @@ public static class ConfigPresets
                 config.DoubleClick.Buttons = MouseButtonFlags.Left;
                 config.DoubleClick.IntervalMs = 50;
                 config.DoubleClick.PressDurationMs = 10;
+                config.DoubleClickRight.IntervalMs = 50;
+                config.DoubleClickRight.PressDurationMs = 10;
                 config.Sensitivity.DpiStagesEnabled = true;
                 config.Sensitivity.Stages = new List<DpiStage>
                 {
@@ -67,6 +69,8 @@ public static class ConfigPresets
                 config.DoubleClick.Buttons = MouseButtonFlags.Left;
                 config.DoubleClick.IntervalMs = 40;
                 config.DoubleClick.PressDurationMs = 8;
+                config.DoubleClickRight.IntervalMs = 40;
+                config.DoubleClickRight.PressDurationMs = 8;
                 NoAcceleration(config);
                 break;
 
@@ -77,42 +81,40 @@ public static class ConfigPresets
                 config.DoubleClick.Buttons = MouseButtonFlags.Left;
                 config.DoubleClick.IntervalMs = 55;
                 config.DoubleClick.PressDurationMs = 12;
+                config.DoubleClickRight.IntervalMs = 55;
+                config.DoubleClickRight.PressDurationMs = 12;
                 NoAcceleration(config);
                 break;
         }
-
         return config;
-    }
-
-    /// <summary>The configs created on first run (and after "Reset all settings").</summary>
-    public static List<MouseConfig> CreateStarterConfigs()
-    {
-        var configs = All.Select(p => Create(p)).ToList();
-        configs[0].Hotkey = new KeyChord(0x31, KeyModifiers.Ctrl | KeyModifiers.Alt); // Default       → Ctrl+Alt+1
-        configs[2].Hotkey = new KeyChord(0x32, KeyModifiers.Ctrl | KeyModifiers.Alt); // Minecraft PvP → Ctrl+Alt+2
-        configs[5].Hotkey = new KeyChord(0x33, KeyModifiers.Ctrl | KeyModifiers.Alt); // Custom        → Ctrl+Alt+3
-        return configs;
     }
 
     public static SettingsDocument CreateDefaultDocument()
     {
-        var configs = CreateStarterConfigs();
-        var doc = new SettingsDocument
+        var doc = new SettingsDocument();
+        foreach (var preset in All)
         {
-            Configs = configs,
-            ActiveConfigId = configs[0].Id,
-            DefaultConfigId = configs[0].Id,
-            MasterEnabled = true,
-        };
-        doc.App.LastManualConfigId = configs[0].Id;
-        doc.App.DpiUpHotkey = new KeyChord(0x21, KeyModifiers.Ctrl | KeyModifiers.Alt);   // Ctrl+Alt+Page Up
-        doc.App.DpiDownHotkey = new KeyChord(0x22, KeyModifiers.Ctrl | KeyModifiers.Alt); // Ctrl+Alt+Page Down
+            var config = Create(
+                preset,
+                preset == Default ? "Default" : preset == Custom ? "Custom" : preset);
+            if (preset == MinecraftPvp)
+            {
+                config.Hotkey = new KeyChord(0x32, KeyModifiers.Ctrl | KeyModifiers.Alt); // Ctrl+Alt+2
+            }
+            else if (preset == Gaming)
+            {
+                config.Hotkey = new KeyChord(0x31, KeyModifiers.Ctrl | KeyModifiers.Alt); // Ctrl+Alt+1
+            }
+            doc.Configs.Add(config);
+        }
+        doc.DefaultConfigId = doc.Configs[0].Id;
+        doc.ActiveConfigId = doc.Configs[0].Id;
         return doc;
     }
 
     public static List<DpiStage> DefaultStages() => new()
     {
-        new(400), new(800), new(1600), new(3200), new(6400, false),
+        new(400), new(800), new(1200), new(1600), new(3200, false),
     };
 
     private static void NoAcceleration(MouseConfig config)

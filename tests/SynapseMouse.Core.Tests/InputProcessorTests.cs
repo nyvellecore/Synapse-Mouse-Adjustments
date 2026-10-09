@@ -54,16 +54,13 @@ public class InputProcessorTests
     {
         var (p, _) = Create(c => { c.Debounce.Enabled = true; c.Debounce.TimeMs = 5; });
         Assert.True(p.Settings.NeedsMouseHook);
-
         // Press with contact bounce: D(0) U(1) D(2) … U(80)
         Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, true, T0));
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Left, false, T0 + 1 * Ms));
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Left, true, T0 + 2 * Ms));
-
         _out.Clear();
         p.Tick(T0 + 5 * Ms, _out);
         Assert.Empty(_out); // settled in the reported (down) state: nothing to do
-
         Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, false, T0 + 80 * Ms));
         Assert.Equal(2, p.BouncesFiltered);
     }
@@ -74,7 +71,6 @@ public class InputProcessorTests
         var (p, _) = Create(c => { c.Debounce.Enabled = true; c.Debounce.TimeMs = 5; });
         Button(p, MouseButton.Left, true, T0);
         Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, false, T0 + 60 * Ms));
-
         // Failing switch chatters right after release: D(+2) U(+3) would be a phantom double click.
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Left, true, T0 + 62 * Ms));
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Left, false, T0 + 63 * Ms));
@@ -91,7 +87,6 @@ public class InputProcessorTests
         // Released after only 4 ms (inside the lockout) — must not be lost.
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Left, false, T0 + 4 * Ms));
         Assert.Equal(T0 + 10 * Ms, p.NextTickUs);
-
         _out.Clear();
         p.Tick(T0 + 10 * Ms, _out);
         var up = Assert.Single(_out);
@@ -105,14 +100,12 @@ public class InputProcessorTests
     {
         var (p, _) = Create(c => { c.Debounce.Enabled = true; c.Debounce.TimeMs = 8; c.Debounce.Mode = DebounceMode.StableRelease; });
         Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, true, T0));
-
         // Drag: a 2 ms glitch release while holding must not drop the drag.
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Left, false, T0 + 500 * Ms));
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Left, true, T0 + 502 * Ms));
         _out.Clear();
         p.Tick(T0 + 520 * Ms, _out);
         Assert.Empty(_out);
-
         // Real release: confirmed after the stable time.
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Left, false, T0 + 900 * Ms));
         _out.Clear();
@@ -158,7 +151,6 @@ public class InputProcessorTests
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Right, true, T0));
         Assert.Equal(OutputKind.ButtonDown, Assert.Single(_out).Kind);
         Assert.Equal(MouseButton.Left, _out[0].Button);
-
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Right, false, T0 + 40 * Ms));
         Assert.Equal(OutputKind.ButtonUp, Assert.Single(_out).Kind);
         Assert.Equal(MouseButton.Left, _out[0].Button);
@@ -168,11 +160,11 @@ public class InputProcessorTests
     public void Remap_TwoInputsSameOutput_BehaveLikeOneHeldButton()
     {
         var (p, _) = Create(c => c.Buttons.SetMapping(InputSource.RightButton, ActionType.LeftClick));
-        Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, true, T0));             // real left held
-        Assert.Equal(HookDecision.Block, Button(p, MouseButton.Right, true, T0 + 5 * Ms));  // already held: nothing sent
+        Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, true, T0)); // real left held
+        Assert.Equal(HookDecision.Block, Button(p, MouseButton.Right, true, T0 + 5 * Ms)); // already held: nothing sent
         Assert.Empty(_out);
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Right, false, T0 + 10 * Ms));
-        Assert.Empty(_out);                                                                  // left still held
+        Assert.Empty(_out); // left still held
         Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, false, T0 + 20 * Ms));
     }
 
@@ -182,11 +174,9 @@ public class InputProcessorTests
         var (p, config) = Create(c => c.Buttons.SetMapping(InputSource.MiddleButton, ActionType.ForwardButton));
         Button(p, MouseButton.Middle, true, T0);
         Assert.Equal(MouseButton.XButton2, _out[0].Button);
-
         // Config changes while the button is held.
         config.Buttons.SetMapping(InputSource.MiddleButton, ActionType.BackButton);
         p.UpdateSettings(ProcessorSettings.FromConfig(config, true), T0 + 1 * Ms, _out);
-
         Button(p, MouseButton.Middle, false, T0 + 30 * Ms);
         var up = Assert.Single(_out);
         Assert.Equal(OutputKind.ButtonUp, up.Kind);
@@ -210,7 +200,6 @@ public class InputProcessorTests
         var down = Assert.Single(_out);
         Assert.Equal(OutputKind.KeyDown, down.Kind);
         Assert.Equal(KeyNames.VkLShift, down.Vk);
-
         Button(p, MouseButton.XButton1, false, T0 + 500 * Ms);
         var up = Assert.Single(_out);
         Assert.Equal(OutputKind.KeyUp, up.Kind);
@@ -238,20 +227,17 @@ public class InputProcessorTests
             c.DoubleClick.PressDurationMs = 10;
             c.DoubleClick.Timing = DoubleClickTiming.OnPress;
         });
-
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Left, true, T0));
         Assert.Equal(3, _out.Count);
         Assert.Equal((OutputKind.ButtonDown, T0), (_out[0].Kind, _out[0].DueUs));
         Assert.Equal((OutputKind.ButtonUp, T0 + 10 * Ms), (_out[1].Kind, _out[1].DueUs));
         Assert.Equal((OutputKind.ButtonDown, T0 + 50 * Ms), (_out[2].Kind, _out[2].DueUs));
-
         // Physical release comes early (30 ms): the second click is still held at least the press duration.
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Left, false, T0 + 30 * Ms));
         var up = Assert.Single(_out);
         Assert.Equal(OutputKind.ButtonUp, up.Kind);
         Assert.Equal(T0 + 60 * Ms, up.DueUs);
         Assert.Equal(1, p.GeneratedDoubleClicks);
-
         // Physical release long after: second click's release follows the physical release.
         Button(p, MouseButton.Left, true, T0 + 200 * Ms);
         Button(p, MouseButton.Left, false, T0 + 400 * Ms);
@@ -264,15 +250,14 @@ public class InputProcessorTests
         var (p, _) = Create(c =>
         {
             c.DoubleClick.Enabled = true;
+            c.DoubleClick.Buttons = MouseButtonFlags.Left;
             c.DoubleClick.IntervalMs = 50;
             c.DoubleClick.PressDurationMs = 10;
             c.DoubleClick.Timing = DoubleClickTiming.AfterRelease;
         });
-
         // Press passes through with zero latency.
         Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, true, T0));
         Assert.Empty(_out);
-
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Left, false, T0 + 20 * Ms));
         Assert.Equal(3, _out.Count);
         Assert.Equal((OutputKind.ButtonUp, T0 + 20 * Ms), (_out[0].Kind, _out[0].DueUs));
@@ -286,10 +271,10 @@ public class InputProcessorTests
         var (p, _) = Create(c =>
         {
             c.DoubleClick.Enabled = true;
+            c.DoubleClick.Buttons = MouseButtonFlags.Left;
             c.DoubleClick.IntervalMs = 60;
             c.DoubleClick.PressDurationMs = 10;
         });
-
         var all = new List<OutputEvent>();
         long t = T0;
         for (int i = 0; i < 20; i++)
@@ -302,7 +287,6 @@ public class InputProcessorTests
             all.AddRange(_out);
             t += 45 * Ms; // Faster than the generated sequence: events must queue, never interleave.
         }
-
         // Output must strictly alternate down/up in time order.
         bool expectDown = true;
         long last = long.MinValue;
@@ -313,7 +297,6 @@ public class InputProcessorTests
             last = e.DueUs;
             expectDown = !expectDown;
         }
-
         Assert.False(expectDown == false, "sequence must end with a release");
         Assert.Equal(80, all.Count);
     }
@@ -328,6 +311,60 @@ public class InputProcessorTests
     }
 
     [Fact]
+    public void SingleToDouble_RightSettings_GenerateRightClicks()
+    {
+        var (p, _) = Create(c =>
+        {
+            c.DoubleClickRight.Enabled = true;
+            c.DoubleClickRight.IntervalMs = 40;
+            c.DoubleClickRight.PressDurationMs = 8;
+        });
+        // The dedicated right settings apply to the right button only; left stays normal.
+        Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, true, T0));
+        Assert.Equal(HookDecision.Block, Button(p, MouseButton.Right, true, T0));
+        Assert.Equal(3, _out.Count);
+        Assert.Equal((OutputKind.ButtonDown, T0), (_out[0].Kind, _out[0].DueUs));
+        Assert.Equal((OutputKind.ButtonUp, T0 + 8 * Ms), (_out[1].Kind, _out[1].DueUs));
+        Assert.Equal((OutputKind.ButtonDown, T0 + 40 * Ms), (_out[2].Kind, _out[2].DueUs));
+        Assert.Equal(MouseButton.Right, _out[0].Button);
+    }
+
+    [Fact]
+    public void SingleToDouble_RightSettings_OverrideLegacyOnTheSameButton()
+    {
+        // Legacy left settings with Buttons=Right must lose against the dedicated right instance.
+        var (p, _) = Create(c =>
+        {
+            c.DoubleClick.Enabled = true;
+            c.DoubleClick.Buttons = MouseButtonFlags.Right;
+            c.DoubleClick.IntervalMs = 100;
+            c.DoubleClickRight.Enabled = true;
+            c.DoubleClickRight.IntervalMs = 35;
+        });
+        Assert.Equal(HookDecision.Block, Button(p, MouseButton.Right, true, T0));
+        Assert.Equal((OutputKind.ButtonDown, T0 + 35 * Ms), (_out[2].Kind, _out[2].DueUs));
+    }
+
+    [Fact]
+    public void SingleToDouble_Suspension_PassesEverythingThrough()
+    {
+        var config = ConfigPresets.Create(ConfigPresets.Default);
+        config.DoubleClick.Enabled = true;
+        config.DoubleClickRight.Enabled = true;
+        ConfigSanitizer.Sanitize(config);
+        var p = new InputProcessor();
+        p.UpdateSettings(ProcessorSettings.FromConfig(config, enabled: true, doubleClickSuspended: true), T0, new List<OutputEvent>());
+        Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, true, T0));
+        Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Right, true, T0));
+        Assert.Empty(_out);
+        Assert.False(p.Settings.Transforms[(int)MouseButton.Left].Double);
+        Assert.False(p.Settings.Transforms[(int)MouseButton.Right].Double);
+        // ...and the config itself was not modified:
+        Assert.True(config.DoubleClick.Enabled);
+        Assert.True(config.DoubleClickRight.Enabled);
+    }
+
+    [Fact]
     public void ClickResponse_MinimumHold_ExtendsShortClicks()
     {
         var (p, _) = Create(c =>
@@ -336,11 +373,9 @@ public class InputProcessorTests
             c.ClickResponse.Buttons = MouseButtonFlags.Left;
             c.ClickResponse.MinimumHoldMs = 40;
         });
-
         Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, true, T0)); // press is still instant
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Left, false, T0 + 10 * Ms));
         Assert.Equal(T0 + 40 * Ms, Assert.Single(_out).DueUs);
-
         // Long clicks are untouched.
         Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, true, T0 + 100 * Ms));
         Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Left, false, T0 + 200 * Ms));
@@ -355,7 +390,6 @@ public class InputProcessorTests
             c.ClickResponse.PressDelayMs = 5;
             c.ClickResponse.ReleaseDelayMs = 7;
         });
-
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Right, true, T0));
         Assert.Equal((OutputKind.ButtonDown, T0 + 5 * Ms), (_out[0].Kind, _out[0].DueUs));
         Assert.Equal(HookDecision.Block, Button(p, MouseButton.Right, false, T0 + 50 * Ms));
@@ -380,17 +414,14 @@ public class InputProcessorTests
             c.Buttons.SetMapping(InputSource.RightButton, ActionType.Keyboard, new KeyChord(0x46)); // F
             c.Buttons.SetMapping(InputSource.MiddleButton, ActionType.SensitivityClutch);
         });
-
         Button(p, MouseButton.Right, true, T0);
         Button(p, MouseButton.Middle, true, T0);
         Assert.True(p.ClutchActive);
-
         _out.Clear();
         p.UpdateSettings(ProcessorSettings.Disabled, T0 + 5 * Ms, _out);
         Assert.Contains(_out, e => e.Kind == OutputKind.KeyUp && e.Vk == 0x46);
         Assert.Contains(_out, e => e.Command == ProcessorCommand.ClutchOff);
         Assert.False(p.ClutchActive);
-
         // After disabling, the physical releases pass straight through.
         Assert.Equal(HookDecision.Pass, Button(p, MouseButton.Right, false, T0 + 10 * Ms));
     }
@@ -449,7 +480,6 @@ public class InputProcessorTests
             p.OnWheel(false, 120, T0 + (i * 20 * Ms), KeyModifiers.None, true, _out);
             deltas.Add(_out.Count == 0 ? 120 : _out[0].X);
         }
-
         Assert.Equal(120, deltas[0]);
         Assert.True(deltas[5] > deltas[1]);
         Assert.Equal(360, deltas[^1]); // capped at 3×
@@ -480,7 +510,6 @@ public class InputProcessorTests
             c.Sensitivity.ActiveStage = 0; // 0.5×
         });
         Assert.True(p.WantsMovement);
-
         int total = 0;
         for (int i = 0; i < 10; i++)
         {
@@ -488,7 +517,6 @@ public class InputProcessorTests
             Assert.Equal(HookDecision.Block, p.OnMove(1, 0, T0 + i, _out));
             total += _out.Sum(e => e.X);
         }
-
         Assert.Equal(5, total); // 10 counts × 0.5 — no movement lost to rounding
     }
 
@@ -522,13 +550,11 @@ public class InputProcessorTests
         Assert.True(p.WantsMovement);
         _out.Clear();
         Assert.Equal(HookDecision.Pass, p.OnMove(10, 0, T0, _out));
-
         Button(p, MouseButton.XButton2, true, T0);
         Assert.Equal(ProcessorCommand.ClutchOn, Assert.Single(_out).Command);
         _out.Clear();
         p.OnMove(10, 0, T0 + 1, _out);
         Assert.Equal(5, Assert.Single(_out).X);
-
         Button(p, MouseButton.XButton2, false, T0 + 2);
         Assert.Equal(ProcessorCommand.ClutchOff, Assert.Single(_out).Command);
     }
@@ -542,12 +568,10 @@ public class InputProcessorTests
             Action = ActionType.BackButton,
         }));
         Assert.True(p.Settings.NeedsKeyboardHook);
-
         _out.Clear();
         Assert.Equal(HookDecision.Pass, p.OnKey(0x41, true, T0, KeyModifiers.None, _out));
         Assert.Equal(HookDecision.Block, p.OnKey(KeyNames.VkF13, true, T0, KeyModifiers.None, _out));
         Assert.Equal((OutputKind.ButtonDown, MouseButton.XButton1), (_out[0].Kind, _out[0].Button));
-
         _out.Clear();
         Assert.Equal(HookDecision.Block, p.OnKey(KeyNames.VkF13, true, T0 + 30 * Ms, KeyModifiers.None, _out)); // auto-repeat
         Assert.Empty(_out);
@@ -563,7 +587,6 @@ public class InputProcessorTests
             Trigger = new KeyChord(0x51, KeyModifiers.Alt), // Alt+Q
             Action = ActionType.ForwardButton,
         }));
-
         _out.Clear();
         Assert.Equal(HookDecision.Pass, p.OnKey(0x51, true, T0, KeyModifiers.None, _out));
         Assert.Equal(HookDecision.Pass, p.OnKey(0x51, false, T0, KeyModifiers.None, _out));

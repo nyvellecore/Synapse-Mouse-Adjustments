@@ -15,6 +15,20 @@ internal sealed class ClickViewModel : ConfigPageViewModel
     {
         _statsTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
         _statsTimer.Tick += (_, _) => OnPropertyChanged(nameof(StatsText));
+
+        controller.AppSettingsChanged += (sender, _) =>
+        {
+            if (!ReferenceEquals(sender, this))
+            {
+                OnPropertyChanged(nameof(DoubleClickToggleHotkey));
+            }
+        };
+        // The toggle hotkey pauses Single → Double click without a config edit: reflect it immediately.
+        controller.StateChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(DoubleClickSuspended));
+            OnPropertyChanged(nameof(DoubleSummary));
+        };
     }
 
     // ------------------------------------------------------------------ debounce
@@ -44,22 +58,17 @@ internal sealed class ClickViewModel : ConfigPageViewModel
     }
 
     public string DebounceSummary => Config.Debounce.Enabled
-        ? string.Format(CultureInfo.CurrentCulture, "Current value: {0} ms ({1})", Config.Debounce.TimeMs,
+        ? string.Format(CultureInfo.CurrentCulture, "Current value: {0} ms ({1})",
+            Config.Debounce.TimeMs,
             Config.Debounce.Mode == DebounceMode.Eager ? "instant press, bounce filtered" : "instant press, confirmed release")
         : "Off — every press and release from the mouse is passed on unchanged.";
 
-    // ------------------------------------------------------------------ single → double
+    // ------------------------------------------------------------------ single → double (left button)
 
-    public bool DoubleEnabled
+    public bool DoubleLeftEnabled
     {
         get => Config.DoubleClick.Enabled;
         set => Edit(c => c.DoubleClick.Enabled = value);
-    }
-
-    public MouseButtonFlags DoubleButtons
-    {
-        get => Config.DoubleClick.Buttons;
-        set => Edit(c => c.DoubleClick.Buttons = value);
     }
 
     public double DoubleInterval
@@ -88,24 +97,96 @@ internal sealed class ClickViewModel : ConfigPageViewModel
         set => Edit(c => c.DoubleClick.Timing = value);
     }
 
+    // ------------------------------------------------------------------ single → double (right button)
+
+    public bool DoubleRightEnabled
+    {
+        get => Config.DoubleClickRight.Enabled;
+        set => Edit(c => c.DoubleClickRight.Enabled = value);
+    }
+
+    public double DoubleRightInterval
+    {
+        get => Config.DoubleClickRight.IntervalMs;
+        set => Edit(c =>
+        {
+            c.DoubleClickRight.IntervalMs = (int)Math.Round(value);
+            ConfigSanitizer.Sanitize(c);
+        });
+    }
+
+    public double DoubleRightPress
+    {
+        get => Config.DoubleClickRight.PressDurationMs;
+        set => Edit(c =>
+        {
+            c.DoubleClickRight.PressDurationMs = (int)Math.Round(value);
+            ConfigSanitizer.Sanitize(c);
+        });
+    }
+
+    public DoubleClickTiming DoubleRightTiming
+    {
+        get => Config.DoubleClickRight.Timing;
+        set => Edit(c => c.DoubleClickRight.Timing = value);
+    }
+
+    // ------------------------------------------------------------------ single → double (shared)
+
+    /// <summary>True while the toggle hotkey has turned Single → Double click off for every button.</summary>
+    public bool DoubleClickSuspended => Controller.DoubleClickSuspended;
+
+    public KeyChord? DoubleClickToggleHotkey
+    {
+        get => Controller.App.DoubleClickToggleHotkey;
+        set
+        {
+            var chord = ConfigSanitizer.CleanTrigger(value);
+            Controller.App.DoubleClickToggleHotkey = Core.Input.InputSafety.IsReserved(chord) ? null : chord;
+            Controller.OnAppSettingsEdited(this);
+            OnPropertyChanged(nameof(DoubleClickToggleHotkeyStatus));
+        }
+    }
+
+    public string DoubleClickToggleHotkeyStatus => Controller.Hotkeys.Failed.Contains(HotkeyService.DoubleClickToggleId)
+        ? "This shortcut is already used by another app or another Synapse hotkey."
+        : "Optional shortcut that turns Single → Double click on or off from anywhere — handy between PvP matches.";
+
     public string DoubleSummary
     {
         get
         {
-            var d = Config.DoubleClick;
-            if (!d.Enabled)
+            if (DoubleClickSuspended)
+            {
+                return "Paused with the toggle hotkey — one physical click produces one click until you press the hotkey again.";
+            }
+            string left = DescribeSide(Config.DoubleClick, "Left button");
+            string right = DescribeSide(Config.DoubleClickRight, "Right button");
+            if (left.Length == 0 && right.Length == 0)
             {
                 return "Off — one physical click produces one click.";
             }
-
-            string timing = d.Timing == DoubleClickTiming.OnPress
-                ? $"click 1 at press, click 2 starts {d.IntervalMs} ms later"
-                : $"click 2 starts {d.IntervalMs} ms after click 1, once you release";
-            string warning = d.IntervalMs >= WindowsSettingsDoubleClickTime
-                ? " Note: the interval is longer than the Windows double-click time, so Windows apps see two single clicks."
+            string both = left.Length == 0 ? right : right.Length == 0 ? left : left + " " + right;
+            int interval = Math.Max(EnabledInterval(Config.DoubleClick), EnabledInterval(Config.DoubleClickRight));
+            string warning = interval >= WindowsSettingsDoubleClickTime
+                ? " Note: an interval longer than the Windows double-click time makes Windows apps see two single clicks."
                 : string.Empty;
-            return $"One physical click → two clicks ({timing}, each held {d.PressDurationMs} ms).{warning}";
+            return both + warning;
         }
+    }
+
+    private static int EnabledInterval(SingleToDoubleSettings s) => s.Enabled ? s.IntervalMs : 0;
+
+    private static string DescribeSide(SingleToDoubleSettings s, string button)
+    {
+        if (!s.Enabled)
+        {
+            return string.Empty;
+        }
+        string timing = s.Timing == DoubleClickTiming.OnPress
+            ? $"click 1 at press, click 2 starts {s.IntervalMs} ms later"
+            : $"click 2 starts {s.IntervalMs} ms after click 1, once you release";
+        return $"{button}: one physical click → two clicks ({timing}, each held {s.PressDurationMs} ms).";
     }
 
     // ------------------------------------------------------------------ click response
@@ -196,6 +277,8 @@ internal sealed class ClickViewModel : ConfigPageViewModel
         OnPropertyChanged(nameof(DoubleSummary));
         OnPropertyChanged(nameof(DoubleInterval));
         OnPropertyChanged(nameof(DoublePress));
+        OnPropertyChanged(nameof(DoubleRightInterval));
+        OnPropertyChanged(nameof(DoubleRightPress));
         OnPropertyChanged(nameof(DoubleClickTime));
         OnPropertyChanged(nameof(DoubleClickTimeNote));
     }

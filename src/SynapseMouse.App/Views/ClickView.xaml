@@ -3,126 +3,152 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="clr-namespace:SynapseMouse.App.Controls"
              x:ClassModifier="internal">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="36,8,36,36">
-            <TextBlock Text="{Binding Title}" Style="{StaticResource Text.PageTitle}" />
-            <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Text.PageSubtitle}" Margin="0,4,0,22" />
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="36,8,36,36">
+      <TextBlock Text="{Binding Title}" Style="{StaticResource Text.PageTitle}" />
+      <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Text.PageSubtitle}" Margin="0,4,0,22" />
 
-            <!-- Debounce -->
-            <Border Style="{StaticResource Card}">
-                <StackPanel>
-                    <c:SettingItem Style="{StaticResource CardHeader}" Title="Debounce"
-                                   Description="Filters contact bounce so one press can't register as two (unwanted double clicks) and a held button isn't released by a glitch.">
-                        <CheckBox Style="{StaticResource Toggle}" IsChecked="{Binding DebounceEnabled}" ToolTip="Enable debounce" />
-                    </c:SettingItem>
-                    <Border Style="{StaticResource Note}" Margin="0,4,0,8">
-                        <TextBlock Style="{StaticResource Text.Note}">
-                            <Run Text="Software debounce." FontWeight="SemiBold" />
-                            <Run Text="No software can change the debounce circuit or firmware inside your mouse. Synapse filters the click events after they arrive in Windows: edges that follow an accepted press/release within the debounce time are treated as bounce and dropped, and the switch's final state is always delivered — so real clicks are never lost." />
-                        </TextBlock>
-                    </Border>
-                    <StackPanel IsEnabled="{Binding DebounceEnabled}">
-                        <c:SettingItem Title="Debounce time" Description="Typical values are 2–10 ms. Higher values also block intentional clicks faster than this.">
-                            <c:NumericSlider Value="{Binding DebounceMs}" Minimum="1" Maximum="100" SliderMaximum="30" Step="1" Unit="ms" Width="320" />
-                        </c:SettingItem>
-                        <c:SettingItem Title="Mode" Description="Instant: zero added latency. Confirmed release: a release only counts once the switch has stayed open for the debounce time (fixes drag drops; adds that delay to releases).">
-                            <Border Style="{StaticResource SegmentHost}">
-                                <StackPanel Orientation="Horizontal">
-                                    <RadioButton Style="{StaticResource Segment}" GroupName="DebounceMode" Content="Instant"
-                                                 IsChecked="{Binding DebounceMode, Converter={StaticResource EnumToBool}, ConverterParameter=Eager}" />
-                                    <RadioButton Style="{StaticResource Segment}" GroupName="DebounceMode" Content="Confirmed release"
-                                                 IsChecked="{Binding DebounceMode, Converter={StaticResource EnumToBool}, ConverterParameter=StableRelease}" />
-                                </StackPanel>
-                            </Border>
-                        </c:SettingItem>
-                        <c:SettingItem Title="Apply to">
-                            <c:ButtonPicker Value="{Binding DebounceButtons}" />
-                        </c:SettingItem>
-                    </StackPanel>
-                    <TextBlock Text="{Binding DebounceSummary}" Style="{StaticResource Text.Caption}" FontWeight="Normal" FontSize="12" Margin="0,10,0,0" />
+      <!-- Debounce -->
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <c:SettingItem Style="{StaticResource CardHeader}" Title="Debounce"
+                         Description="Filters contact bounce so one press can't register as two (unwanted double clicks) and a held button isn't released by a glitch.">
+            <CheckBox Style="{StaticResource Toggle}" IsChecked="{Binding DebounceEnabled}" ToolTip="Enable debounce" />
+          </c:SettingItem>
+          <Border Style="{StaticResource Note}" Margin="0,4,0,8">
+            <TextBlock Style="{StaticResource Text.Note}">
+              <Run Text="Software debounce." FontWeight="SemiBold" />
+              <Run Text="No software can change the debounce circuit or firmware inside your mouse. Synapse filters the click events after they arrive in Windows: edges that follow an accepted press/release within the debounce time are treated as bounce and dropped, and the switch's final state is always delivered — so real clicks are never lost." />
+            </TextBlock>
+          </Border>
+          <StackPanel IsEnabled="{Binding DebounceEnabled}">
+            <c:SettingItem Title="Debounce time" Description="Typical values are 2–10 ms. Higher values also block intentional clicks faster than this.">
+              <c:NumericSlider Value="{Binding DebounceMs}" Minimum="1" Maximum="100" SliderMaximum="30" Step="1" Unit="ms" Width="320" />
+            </c:SettingItem>
+            <c:SettingItem Title="Mode" Description="Instant: zero added latency. Confirmed release: a release only counts once the switch has stayed open for the debounce time (fixes drag drops; adds that delay to releases).">
+              <Border Style="{StaticResource SegmentHost}">
+                <StackPanel Orientation="Horizontal">
+                  <RadioButton Style="{StaticResource Segment}" GroupName="DebounceMode" Content="Instant"
+                               IsChecked="{Binding DebounceMode, Converter={StaticResource EnumToBool}, ConverterParameter=Eager}" />
+                  <RadioButton Style="{StaticResource Segment}" GroupName="DebounceMode" Content="Confirmed release"
+                               IsChecked="{Binding DebounceMode, Converter={StaticResource EnumToBool}, ConverterParameter=StableRelease}" />
                 </StackPanel>
-            </Border>
-
-            <!-- Single → Double -->
-            <Border Style="{StaticResource Card}">
-                <StackPanel>
-                    <c:SettingItem Style="{StaticResource CardHeader}" Title="Single Click → Double Click"
-                                   Description="Each physical click produces two normal Windows clicks. Useful where a game counts each click separately, such as some Minecraft PvP setups.">
-                        <CheckBox Style="{StaticResource Toggle}" IsChecked="{Binding DoubleEnabled}" ToolTip="Enable Single → Double click" />
-                    </c:SettingItem>
-                    <StackPanel IsEnabled="{Binding DoubleEnabled}">
-                        <c:SettingItem Title="Buttons" Description="Which physical buttons produce double clicks.">
-                            <c:ButtonPicker Value="{Binding DoubleButtons}" />
-                        </c:SettingItem>
-                        <c:SettingItem Title="Double-click interval" Description="Time from the start of the first click to the start of the second.">
-                            <c:NumericSlider Value="{Binding DoubleInterval}" Minimum="5" Maximum="500" SliderMaximum="150" Step="1" Unit="ms" Width="320" />
-                        </c:SettingItem>
-                        <c:SettingItem Title="Click hold time" Description="How long each generated click is held down. Must be shorter than the interval.">
-                            <c:NumericSlider Value="{Binding DoublePress}" Minimum="1" Maximum="100" SliderMaximum="40" Step="1" Unit="ms" Width="320" />
-                        </c:SettingItem>
-                        <c:SettingItem Title="Click timing" Description="Both on press: fastest, the second click is held for as long as you hold the button. After release: the second click follows your release.">
-                            <Border Style="{StaticResource SegmentHost}">
-                                <StackPanel Orientation="Horizontal">
-                                    <RadioButton Style="{StaticResource Segment}" GroupName="DoubleTiming" Content="Both on press"
-                                                 IsChecked="{Binding DoubleTiming, Converter={StaticResource EnumToBool}, ConverterParameter=OnPress}" />
-                                    <RadioButton Style="{StaticResource Segment}" GroupName="DoubleTiming" Content="After release"
-                                                 IsChecked="{Binding DoubleTiming, Converter={StaticResource EnumToBool}, ConverterParameter=AfterRelease}" />
-                                </StackPanel>
-                            </Border>
-                        </c:SettingItem>
-                    </StackPanel>
-                    <TextBlock Text="{Binding DoubleSummary}" Style="{StaticResource Text.Caption}" FontWeight="Normal" FontSize="12" TextWrapping="Wrap" Margin="0,10,0,0" />
-                    <Border Style="{StaticResource InfoBox}" Margin="0,12,0,0">
-                        <TextBlock Style="{StaticResource Text.Body}"
-                                   Text="Generated clicks are ordinary Windows input, delivered on a high-precision timer. Synapse does not disguise them from games or anti-cheat software — some servers do not allow double-click tools, so check the rules where you play." />
-                    </Border>
-                </StackPanel>
-            </Border>
-
-            <!-- Click response -->
-            <Border Style="{StaticResource Card}">
-                <StackPanel>
-                    <c:SettingItem Style="{StaticResource CardHeader}" Title="Click response"
-                                   Description="Press/release timing like gaming-mouse software. Everything at 0 ms means the fastest possible response.">
-                        <CheckBox Style="{StaticResource Toggle}" IsChecked="{Binding ResponseEnabled}" ToolTip="Enable click response timing" />
-                    </c:SettingItem>
-                    <StackPanel IsEnabled="{Binding ResponseEnabled}">
-                        <c:SettingItem Title="Apply to">
-                            <c:ButtonPicker Value="{Binding ResponseButtons}" />
-                        </c:SettingItem>
-                        <c:SettingItem Title="Press delay" Description="Delays when a press is delivered. Adds latency — keep at 0 unless you need it.">
-                            <c:NumericSlider Value="{Binding PressDelay}" Minimum="0" Maximum="100" SliderMaximum="50" Step="1" Unit="ms" Width="320" />
-                        </c:SettingItem>
-                        <c:SettingItem Title="Release delay" Description="Keeps each click held a little longer after you let go.">
-                            <c:NumericSlider Value="{Binding ReleaseDelay}" Minimum="0" Maximum="100" SliderMaximum="50" Step="1" Unit="ms" Width="320" />
-                        </c:SettingItem>
-                        <c:SettingItem Title="Minimum hold time" Description="Very short clicks are extended to at least this length so games that check the button once per frame never miss them. Presses stay instant.">
-                            <c:NumericSlider Value="{Binding MinimumHold}" Minimum="0" Maximum="200" SliderMaximum="60" Step="1" Unit="ms" Width="320" />
-                        </c:SettingItem>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <!-- Filtering and Windows double-click detection -->
-            <Border Style="{StaticResource Card}">
-                <StackPanel>
-                    <c:SettingItem Style="{StaticResource CardHeader}" Title="Input filtering &amp; detection" />
-                    <c:SettingItem Title="Drop duplicate press events" BorderThickness="0"
-                                   Description="Ignores a second 'pressed' report for a button that is already down (seen with some faulty mice or drivers). Releases are never dropped.">
-                        <CheckBox Style="{StaticResource Toggle}" IsChecked="{Binding SuppressDuplicates}" />
-                    </c:SettingItem>
-                    <c:SettingItem Title="Override Windows double-click time" Description="How quickly two clicks must follow each other for Windows to treat them as a double-click.">
-                        <CheckBox Style="{StaticResource Toggle}" IsChecked="{Binding OverrideDoubleClickTime}" />
-                    </c:SettingItem>
-                    <c:SettingItem Title="Double-click detection time" Description="{Binding DoubleClickTimeNote}" IsEnabled="{Binding OverrideDoubleClickTime}">
-                        <c:NumericSlider Value="{Binding DoubleClickTime}" Minimum="150" Maximum="1000" Step="10" Unit="ms" Width="320" />
-                    </c:SettingItem>
-                </StackPanel>
-            </Border>
-
-            <Border Style="{StaticResource InfoBox}">
-                <TextBlock Text="{Binding StatsText}" Style="{StaticResource Text.Body}" />
-            </Border>
+              </Border>
+            </c:SettingItem>
+            <c:SettingItem Title="Apply to">
+              <c:ButtonPicker Value="{Binding DebounceButtons}" />
+            </c:SettingItem>
+          </StackPanel>
+          <TextBlock Text="{Binding DebounceSummary}" Style="{StaticResource Text.Caption}" FontWeight="Normal" FontSize="12" Margin="0,10,0,0" />
         </StackPanel>
-    </ScrollViewer>
+      </Border>
+
+      <!-- Single → Double -->
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <c:SettingItem Style="{StaticResource CardHeader}" Title="Single Click → Double Click"
+                         Description="Each physical click produces two normal Windows clicks. Useful where a game counts each click separately, such as some Minecraft PvP setups.">
+            <CheckBox Style="{StaticResource Toggle}" IsChecked="{Binding DoubleLeftEnabled}" ToolTip="Enable Single → Double click (left button)" />
+          </c:SettingItem>
+          <StackPanel IsEnabled="{Binding DoubleLeftEnabled}">
+            <c:SettingItem Title="Double-click interval" Description="Time from the start of the first click to the start of the second.">
+              <c:NumericSlider Value="{Binding DoubleInterval}" Minimum="5" Maximum="500" SliderMaximum="150" Step="1" Unit="ms" Width="320" />
+            </c:SettingItem>
+            <c:SettingItem Title="Click hold time" Description="How long each generated click is held down. Must be shorter than the interval.">
+              <c:NumericSlider Value="{Binding DoublePress}" Minimum="1" Maximum="100" SliderMaximum="40" Step="1" Unit="ms" Width="320" />
+            </c:SettingItem>
+            <c:SettingItem Title="Click timing" Description="Both on press: fastest, the second click is held for as long as you hold the button. After release: the second click follows your release.">
+              <Border Style="{StaticResource SegmentHost}">
+                <StackPanel Orientation="Horizontal">
+                  <RadioButton Style="{StaticResource Segment}" GroupName="DoubleTimingLeft" Content="Both on press"
+                               IsChecked="{Binding DoubleTiming, Converter={StaticResource EnumToBool}, ConverterParameter=OnPress}" />
+                  <RadioButton Style="{StaticResource Segment}" GroupName="DoubleTimingLeft" Content="After release"
+                               IsChecked="{Binding DoubleTiming, Converter={StaticResource EnumToBool}, ConverterParameter=AfterRelease}" />
+                </StackPanel>
+              </Border>
+            </c:SettingItem>
+          </StackPanel>
+
+          <!-- Right button -->
+          <c:SettingItem Title="Right button" Description="Give the right mouse button its own Single → Double click with separate delay and hold time.">
+            <CheckBox Style="{StaticResource Toggle}" IsChecked="{Binding DoubleRightEnabled}" ToolTip="Enable Single → Double click (right button)" />
+          </c:SettingItem>
+          <StackPanel IsEnabled="{Binding DoubleRightEnabled}">
+            <c:SettingItem Title="Double-click interval (right)" Description="Time from the start of the first right-click to the start of the second.">
+              <c:NumericSlider Value="{Binding DoubleRightInterval}" Minimum="5" Maximum="500" SliderMaximum="150" Step="1" Unit="ms" Width="320" />
+            </c:SettingItem>
+            <c:SettingItem Title="Click hold time (right)" Description="How long each generated right-click is held down. Must be shorter than the interval.">
+              <c:NumericSlider Value="{Binding DoubleRightPress}" Minimum="1" Maximum="100" SliderMaximum="40" Step="1" Unit="ms" Width="320" />
+            </c:SettingItem>
+            <c:SettingItem Title="Click timing (right)" Description="Both on press: fastest, the second click is held for as long as you hold the button. After release: the second click follows your release.">
+              <Border Style="{StaticResource SegmentHost}">
+                <StackPanel Orientation="Horizontal">
+                  <RadioButton Style="{StaticResource Segment}" GroupName="DoubleTimingRight" Content="Both on press"
+                               IsChecked="{Binding DoubleRightTiming, Converter={StaticResource EnumToBool}, ConverterParameter=OnPress}" />
+                  <RadioButton Style="{StaticResource Segment}" GroupName="DoubleTimingRight" Content="After release"
+                               IsChecked="{Binding DoubleRightTiming, Converter={StaticResource EnumToBool}, ConverterParameter=AfterRelease}" />
+                </StackPanel>
+              </Border>
+            </c:SettingItem>
+          </StackPanel>
+
+          <!-- Toggle hotkey -->
+          <c:SettingItem Title="Toggle hotkey" Description="{Binding DoubleClickToggleHotkeyStatus}">
+            <c:KeyCaptureBox Chord="{Binding DoubleClickToggleHotkey}" Placeholder="Not set" />
+          </c:SettingItem>
+
+          <TextBlock Text="{Binding DoubleSummary}" Style="{StaticResource Text.Caption}" FontWeight="Normal" FontSize="12" TextWrapping="Wrap" Margin="0,10,0,0" />
+          <Border Style="{StaticResource InfoBox}" Margin="0,12,0,0">
+            <TextBlock Style="{StaticResource Text.Body}"
+                       Text="Generated clicks are ordinary Windows input, delivered on a high-precision timer. Synapse does not disguise them from games or anti-cheat software — some servers do not allow double-click tools, so check the rules where you play." />
+          </Border>
+        </StackPanel>
+      </Border>
+
+      <!-- Click response -->
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <c:SettingItem Style="{StaticResource CardHeader}" Title="Click response"
+                         Description="Press/release timing like gaming-mouse software. Everything at 0 ms means the fastest possible response.">
+            <CheckBox Style="{StaticResource Toggle}" IsChecked="{Binding ResponseEnabled}" ToolTip="Enable click response timing" />
+          </c:SettingItem>
+          <StackPanel IsEnabled="{Binding ResponseEnabled}">
+            <c:SettingItem Title="Apply to">
+              <c:ButtonPicker Value="{Binding ResponseButtons}" />
+            </c:SettingItem>
+            <c:SettingItem Title="Press delay" Description="Delays when a press is delivered. Adds latency — keep at 0 unless you need it.">
+              <c:NumericSlider Value="{Binding PressDelay}" Minimum="0" Maximum="100" SliderMaximum="50" Step="1" Unit="ms" Width="320" />
+            </c:SettingItem>
+            <c:SettingItem Title="Release delay" Description="Keeps each click held a little longer after you let go.">
+              <c:NumericSlider Value="{Binding ReleaseDelay}" Minimum="0" Maximum="100" SliderMaximum="50" Step="1" Unit="ms" Width="320" />
+            </c:SettingItem>
+            <c:SettingItem Title="Minimum hold time" Description="Very short clicks are extended to at least this length so games that check the button once per frame never miss them. Presses stay instant.">
+              <c:NumericSlider Value="{Binding MinimumHold}" Minimum="0" Maximum="200" SliderMaximum="60" Step="1" Unit="ms" Width="320" />
+            </c:SettingItem>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Filtering and Windows double-click detection -->
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <c:SettingItem Style="{StaticResource CardHeader}" Title="Input filtering &amp; detection" />
+          <c:SettingItem Title="Drop duplicate press events" BorderThickness="0"
+                         Description="Ignores a second 'pressed' report for a button that is already down (seen with some faulty mice or drivers). Releases are never dropped.">
+            <CheckBox Style="{StaticResource Toggle}" IsChecked="{Binding SuppressDuplicates}" />
+          </c:SettingItem>
+          <c:SettingItem Title="Override Windows double-click time" Description="How quickly two clicks must follow each other for Windows to treat them as a double-click.">
+            <CheckBox Style="{StaticResource Toggle}" IsChecked="{Binding OverrideDoubleClickTime}" />
+          </c:SettingItem>
+          <c:SettingItem Title="Double-click detection time" Description="{Binding DoubleClickTimeNote}" IsEnabled="{Binding OverrideDoubleClickTime}">
+            <c:NumericSlider Value="{Binding DoubleClickTime}" Minimum="150" Maximum="1000" Step="10" Unit="ms" Width="320" />
+          </c:SettingItem>
+        </StackPanel>
+      </Border>
+
+      <Border Style="{StaticResource InfoBox}">
+        <TextBlock Text="{Binding StatsText}" Style="{StaticResource Text.Body}" />
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
 </UserControl>

@@ -27,6 +27,7 @@ public static class ConfigSanitizer
     public static readonly Range ScrollLines = new(1, 100);
     public static readonly Range ScrollChars = new(1, 100);
     public static readonly Range AccelStrength = new(0, 100);
+
     public static readonly DoubleRange Sensitivity = new(0.05, 10.0);
     public static readonly DoubleRange ScrollSensitivity = new(0.1, 10.0);
     public static readonly DoubleRange AccelMax = new(1.0, 10.0);
@@ -38,7 +39,6 @@ public static class ConfigSanitizer
         {
             config.Id = Guid.NewGuid();
         }
-
         config.Name = CleanName(config.Name, "Config");
         config.Preset = ConfigPresets.All.Contains(config.Preset ?? string.Empty) ? config.Preset! : ConfigPresets.Custom;
         config.Hotkey = CleanTrigger(config.Hotkey);
@@ -62,6 +62,13 @@ public static class ConfigSanitizer
         dbl.PressDurationMs = DoublePressMs.Clamp(dbl.PressDurationMs);
         dbl.IntervalMs = Math.Max(DoubleIntervalMs.Clamp(dbl.IntervalMs), dbl.PressDurationMs + 1);
         dbl.Timing = Defined(dbl.Timing, DoubleClickTiming.OnPress);
+
+        config.DoubleClickRight ??= new SingleToDoubleSettings();
+        var dblRight = config.DoubleClickRight;
+        dblRight.Buttons = MouseButtonFlags.Right; // The right-button settings always apply to the right button.
+        dblRight.PressDurationMs = DoublePressMs.Clamp(dblRight.PressDurationMs);
+        dblRight.IntervalMs = Math.Max(DoubleIntervalMs.Clamp(dblRight.IntervalMs), dblRight.PressDurationMs + 1);
+        dblRight.Timing = Defined(dblRight.Timing, DoubleClickTiming.OnPress);
 
         config.ClickResponse ??= new ClickResponseSettings();
         var r = config.ClickResponse;
@@ -90,7 +97,6 @@ public static class ConfigSanitizer
         {
             config.ModifiedUtc = DateTime.UtcNow;
         }
-
         return config;
     }
 
@@ -101,7 +107,6 @@ public static class ConfigSanitizer
         doc.SchemaVersion = SettingsDocument.CurrentSchemaVersion;
         doc.App ??= new AppSettings();
         doc.Configs ??= new List<MouseConfig>();
-
         doc.Configs.RemoveAll(c => c is null);
         if (doc.Configs.Count > MaxConfigs)
         {
@@ -118,7 +123,6 @@ public static class ConfigSanitizer
                 seenIds.Add(config.Id);
             }
         }
-
         if (doc.Configs.Count == 0)
         {
             doc.Configs.Add(ConfigPresets.Create(ConfigPresets.Default));
@@ -129,7 +133,6 @@ public static class ConfigSanitizer
         {
             doc.DefaultConfigId = doc.Configs[0].Id;
         }
-
         if (!ids.Contains(doc.ActiveConfigId))
         {
             doc.ActiveConfigId = doc.DefaultConfigId;
@@ -143,6 +146,12 @@ public static class ConfigSanitizer
         app.DpiUpHotkey = CleanTrigger(app.DpiUpHotkey);
         app.DpiDownHotkey = CleanTrigger(app.DpiDownHotkey);
         app.DpiCycleHotkey = CleanTrigger(app.DpiCycleHotkey);
+        app.DoubleClickToggleHotkey = CleanTrigger(app.DoubleClickToggleHotkey);
+        if (InputSafety.IsReserved(app.DoubleClickToggleHotkey))
+        {
+            app.DoubleClickToggleHotkey = null;
+        }
+
         if (!ids.Contains(app.LastManualConfigId))
         {
             app.LastManualConfigId = doc.ActiveConfigId;
@@ -154,20 +163,17 @@ public static class ConfigSanitizer
         {
             app.AppAssociations.RemoveRange(MaxAssociations, app.AppAssociations.Count - MaxAssociations);
         }
-
         foreach (var a in app.AppAssociations)
         {
             if (a.Id == Guid.Empty)
             {
                 a.Id = Guid.NewGuid();
             }
-
             a.ProcessName = Truncate(a.ProcessName.Trim(), 260);
             a.WindowTitleContains = string.IsNullOrWhiteSpace(a.WindowTitleContains)
                 ? null
                 : Truncate(a.WindowTitleContains.Trim(), 200);
         }
-
         return doc;
     }
 
@@ -178,7 +184,6 @@ public static class ConfigSanitizer
         {
             cleaned = fallback;
         }
-
         return Truncate(cleaned, MaxNameLength);
     }
 
@@ -189,7 +194,6 @@ public static class ConfigSanitizer
         {
             return null;
         }
-
         return new KeyChord(chord.Key, chord.Modifiers & (KeyModifiers.Ctrl | KeyModifiers.Shift | KeyModifiers.Alt | KeyModifiers.Win));
     }
 
@@ -200,7 +204,6 @@ public static class ConfigSanitizer
         {
             return null;
         }
-
         return new KeyChord(chord.Key, chord.Modifiers & (KeyModifiers.Ctrl | KeyModifiers.Shift | KeyModifiers.Alt | KeyModifiers.Win));
     }
 
@@ -214,26 +217,21 @@ public static class ConfigSanitizer
             {
                 continue;
             }
-
             if (cleaned.Any(c => c.Source == m.Source))
             {
                 continue; // Only the first mapping per source counts.
             }
-
             if (m.Source.IsWheel() && m.Action == ActionType.SensitivityClutch)
             {
                 continue;
             }
-
             m.Key = m.Action == ActionType.Keyboard ? CleanTarget(m.Key) : null;
             if (m.Action == ActionType.Keyboard && m.Key is null)
             {
                 continue;
             }
-
             cleaned.Add(m);
         }
-
         buttons.Mappings = cleaned;
 
         buttons.VirtualButtons ??= new List<VirtualButton>();
@@ -242,14 +240,12 @@ public static class ConfigSanitizer
         {
             buttons.VirtualButtons.RemoveRange(MaxVirtualButtons, buttons.VirtualButtons.Count - MaxVirtualButtons);
         }
-
         foreach (var vb in buttons.VirtualButtons)
         {
             if (vb.Id == Guid.Empty)
             {
                 vb.Id = Guid.NewGuid();
             }
-
             vb.Name = CleanName(vb.Name, "Virtual button");
             vb.Trigger = CleanTrigger(vb.Trigger);
             if (InputSafety.IsReserved(vb.Trigger))
@@ -260,7 +256,6 @@ public static class ConfigSanitizer
             {
                 vb.Action = ActionType.BackButton;
             }
-
             vb.Key = vb.Action == ActionType.Keyboard ? CleanTarget(vb.Key) : null;
         }
     }
@@ -274,17 +269,14 @@ public static class ConfigSanitizer
         {
             s.Stages = ConfigPresets.DefaultStages();
         }
-
         if (s.Stages.Count > MaxStages)
         {
             s.Stages.RemoveRange(MaxStages, s.Stages.Count - MaxStages);
         }
-
         foreach (var stage in s.Stages)
         {
             stage.Dpi = StageDpi.Clamp(stage.Dpi);
         }
-
         s.ActiveStage = Math.Clamp(s.ActiveStage, 0, s.Stages.Count - 1);
         s.Stages[s.ActiveStage].Enabled = true; // The active stage can never be a disabled one.
         s.XSensitivity = Sensitivity.Clamp(s.XSensitivity);
